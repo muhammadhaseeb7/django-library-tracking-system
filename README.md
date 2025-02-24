@@ -57,8 +57,13 @@ Ensure you have the following installed on your machine:
 1. **Clone the Repository**
 
    ```bash
-   git clone <repository_url>
-   cd library-tracking-system
+   git clone https://gitlab.com/search-atlas-interviews/django-library-tracking-system
+   cd django-library-tracking-system  
+   
+   # If you dont have a prefered version control, we recommend https://github.com/new (free)
+   git remote rename origin upstream
+   git remote add origin [URL of your newly created repo: https://github.com/...]
+   git push -u origin main
    ```
 
 2. **Create a `.env` File**
