@@ -1,18 +1,20 @@
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, pagination
 from rest_framework.response import Response
 from .models import Author, Book, Member, Loan
 from .serializers import AuthorSerializer, BookSerializer, MemberSerializer, LoanSerializer
 from rest_framework.decorators import action
 from django.utils import timezone
 from .tasks import send_loan_notification
+from datetime import datetime, timedelta
 
 class AuthorViewSet(viewsets.ModelViewSet):
     queryset = Author.objects.all()
     serializer_class = AuthorSerializer
 
 class BookViewSet(viewsets.ModelViewSet):
-    queryset = Book.objects.all()
+    queryset = Book.objects.select_related('author').all()
     serializer_class = BookSerializer
+    pagination_class = pagination.LimitOffsetPagination
 
     @action(detail=True, methods=['post'])
     def loan(self, request, pk=None):
@@ -49,6 +51,27 @@ class MemberViewSet(viewsets.ModelViewSet):
     queryset = Member.objects.all()
     serializer_class = MemberSerializer
 
+
 class LoanViewSet(viewsets.ModelViewSet):
     queryset = Loan.objects.all()
     serializer_class = LoanSerializer
+
+    @action(detail=True, methods=['post'])
+    def extend_due_date(self, request, pk=None):
+        loan = self.get_object()
+        additional_days = request.data.get('additional_days', None)
+
+        if loan.is_returned:
+            return Response({'error': 'Book has already been returned'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if additional_days and additional_days < 0:
+            return Response({'error': 'Additional Days should be greater than zero'}, status=status.HTTP_400_BAD_REQUEST)
+
+        current_day = datetime.today().date()
+        if current_day > loan.due_date:
+            return Response({'error': 'Loan has already been overdue'}, status=status.HTTP_400_BAD_REQUEST)
+
+        loan.due_date += timedelta(days=additional_days)
+        loan.save()
+
+        return Response({self.serializer_class(loan)}, status=status.HTTP_200_OK)
